@@ -4956,19 +4956,19 @@ function renderChatArea(
       ztoolkit.log("[AI-Butler] 快速追问发送失败:", err);
       aiMsgDiv.innerHTML = `<strong>${getString("itempane-assistant-label")}</strong> <span style="color: #f44336;">${getString("itempane-error", { args: { error: err?.message || getString("itempane-send-failed") } })}</span>`;
     } finally {
-      if (!isCurrentChatRender()) return;
-
-      // 恢复状态
-      currentChatState.isChatting = false;
-      currentChatState.abortController = null;
-      sendBtn.textContent = "↑";
-      sendBtn.title = getString("itempane-send");
-      sendBtn.style.background = "#59c0bc";
-      (sendBtn as HTMLButtonElement).disabled = false;
-      stopBtn.style.display = "none";
-      (stopBtn as HTMLButtonElement).disabled = false;
-      (inputBox as HTMLTextAreaElement).disabled = false;
-      inputBox.focus();
+      if (isCurrentChatRender()) {
+        // 恢复状态
+        currentChatState.isChatting = false;
+        currentChatState.abortController = null;
+        sendBtn.textContent = "↑";
+        sendBtn.title = getString("itempane-send");
+        sendBtn.style.background = "#59c0bc";
+        (sendBtn as HTMLButtonElement).disabled = false;
+        stopBtn.style.display = "none";
+        (stopBtn as HTMLButtonElement).disabled = false;
+        (inputBox as HTMLTextAreaElement).disabled = false;
+        inputBox.focus();
+      }
     }
   });
 
