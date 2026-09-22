@@ -213,6 +213,10 @@ let currentChatState: ChatState = {
   savedPairIds: new Set(),
 };
 
+// 每次重新渲染快速对话区块时递增。PDF 提取和模型请求都是异步的，
+// 仅靠 itemId 还不足以阻止同一篇论文的旧渲染实例回写新状态。
+let quickChatRenderToken = 0;
+
 type SidebarAutoRefreshTarget =
   "summary" | "deepRead" | "imageSummary" | "mindmap" | "table";
 
@@ -3840,6 +3844,12 @@ function renderChatArea(
   options: { mode?: "card" | "page" } = {},
 ): void {
   const isPageMode = options.mode === "page";
+  const chatItemId = item.id;
+  const chatRenderToken = ++quickChatRenderToken;
+  const isCurrentChatRender = (): boolean =>
+    quickChatRenderToken === chatRenderToken &&
+    currentChatState.itemId === chatItemId;
+
   currentChatState.abortController?.abort(
     getString("itempane-quick-chat-abort-refreshed"),
   );
@@ -3869,7 +3879,9 @@ function renderChatArea(
     border: 1px solid rgba(89, 192, 188, 0.22);
     border-radius: 10px;
     overflow: hidden;
-    background: rgba(255, 255, 255, 0.72);
+    /* 保留用户对快速追问区域的深色 UI 定制。 */
+    background: rgba(22, 26, 30, 0.96);
+    color: #e8eaed;
     margin-bottom: ${isPageMode ? "0" : "12px"};
   `;
 
@@ -4542,6 +4554,9 @@ function renderChatArea(
   };
 
   const loadPdfContentIfNeeded = async (): Promise<void> => {
+    // 论文切换或侧边栏重绘后，旧渲染实例不得再读写全局聊天状态。
+    if (!isCurrentChatRender()) return;
+
     if (currentChatState.pdfContent) {
       if (!messagesArea.textContent?.trim()) {
         messagesArea.innerHTML = `<div style="color: #4caf50; text-align: center; padding: 10px;">${getString("itempane-chat-pdf-loaded")}</div>`;
@@ -4565,6 +4580,9 @@ function renderChatArea(
             pdfMode,
           );
 
+        // 关键竞态保护：如果用户在提取期间切换了论文，丢弃旧论文结果。
+        if (!isCurrentChatRender()) return;
+
         if (pdfContent) {
           currentChatState.pdfContent = pdfContent;
           currentChatState.isBase64 = isBase64;
@@ -4574,6 +4592,7 @@ function renderChatArea(
         }
       } catch (err: any) {
         ztoolkit.log("[AI-Butler] 快速追问加载 PDF 失败:", err);
+        if (!isCurrentChatRender()) return;
         messagesArea.innerHTML = `<div style="color: #f44336; text-align: center; padding: 10px;">${getString("itempane-chat-load-failed", { args: { message: escapeHtmlForChat(err?.message || getString("common-unknown-error")) } })}</div>`;
       }
     }
@@ -4621,6 +4640,8 @@ function renderChatArea(
 
   // 发送消息处理 - 快速追问（上下文为论文 + 当前对话框内历史）
   sendBtn.addEventListener("click", async () => {
+    if (!isCurrentChatRender()) return;
+
     const question = inputBox.value.trim();
     if (currentChatState.isChatting) return;
 
@@ -4635,6 +4656,7 @@ function renderChatArea(
     // 设置为正在聊天状态
     currentChatState.isChatting = true;
     currentChatState.abortController = createChatAbortController();
+    const requestAbortController = currentChatState.abortController;
     sendBtn.textContent = "…";
     sendBtn.title = getString("itempane-generating-status");
     sendBtn.style.background = "#9e9e9e";
@@ -4801,6 +4823,7 @@ function renderChatArea(
             currentChatState.relatedItems,
             currentChatState.relatedMode,
           );
+          if (!isCurrentChatRender()) return;
           currentChatState.relatedContextSignature =
             relatedContextResult.signature;
           currentChatState.relatedContextIncludedCount =
@@ -4847,6 +4870,8 @@ function renderChatArea(
         conversationQuestion,
       );
 
+      if (!isCurrentChatRender()) return;
+
       let responseMetadata: LLMNoteMetadata | null = null;
       const response = await LLMService.chat({
         content: {
@@ -4857,7 +4882,7 @@ function renderChatArea(
         },
         conversation: conversationHistory,
         transport: {
-          abortSignal: currentChatState.abortController?.signal,
+          abortSignal: requestAbortController?.signal,
         },
         onProgress: (chunk: string) => {
           fullResponse += chunk;
@@ -4867,6 +4892,7 @@ function renderChatArea(
           scrollQuickChatToBottomIfPinned(shouldFollowStream);
         },
       });
+      if (!isCurrentChatRender()) return;
       fullResponse = response.text;
       responseMetadata = LLMNoteMetadataService.fromResponse("chat", response);
 
@@ -4915,7 +4941,7 @@ function renderChatArea(
         }
       });
     } catch (err: any) {
-      if (isChatAbortError(err, currentChatState.abortController?.signal)) {
+      if (isChatAbortError(err, requestAbortController?.signal)) {
         if (fullResponse) {
           updateQuickChatAssistantMessage(
             aiMsgDiv,
@@ -4930,17 +4956,19 @@ function renderChatArea(
       ztoolkit.log("[AI-Butler] 快速追问发送失败:", err);
       aiMsgDiv.innerHTML = `<strong>${getString("itempane-assistant-label")}</strong> <span style="color: #f44336;">${getString("itempane-error", { args: { error: err?.message || getString("itempane-send-failed") } })}</span>`;
     } finally {
-      // 恢复状态
-      currentChatState.isChatting = false;
-      currentChatState.abortController = null;
-      sendBtn.textContent = "↑";
-      sendBtn.title = getString("itempane-send");
-      sendBtn.style.background = "#59c0bc";
-      (sendBtn as HTMLButtonElement).disabled = false;
-      stopBtn.style.display = "none";
-      (stopBtn as HTMLButtonElement).disabled = false;
-      (inputBox as HTMLTextAreaElement).disabled = false;
-      inputBox.focus();
+      if (isCurrentChatRender()) {
+        // 恢复状态
+        currentChatState.isChatting = false;
+        currentChatState.abortController = null;
+        sendBtn.textContent = "↑";
+        sendBtn.title = getString("itempane-send");
+        sendBtn.style.background = "#59c0bc";
+        (sendBtn as HTMLButtonElement).disabled = false;
+        stopBtn.style.display = "none";
+        (stopBtn as HTMLButtonElement).disabled = false;
+        (inputBox as HTMLTextAreaElement).disabled = false;
+        inputBox.focus();
+      }
     }
   });
 
