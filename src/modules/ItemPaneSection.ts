@@ -3763,6 +3763,8 @@ async function ensureQuickChatKatexCss(doc: Document): Promise<void> {
   max-width: 100%;
   overflow-x: auto;
   border-collapse: collapse;
+  background-color: #1b1f23 !important;
+  color: #e8eaed !important;
 }
 #ai-butler-inline-chat .ai-butler-quick-chat-assistant th,
 #ai-butler-inline-chat .ai-butler-quick-chat-assistant td {
@@ -3770,6 +3772,19 @@ async function ensureQuickChatKatexCss(doc: Document): Promise<void> {
   overflow-wrap: anywhere;
   word-break: break-word;
   white-space: normal;
+  background-color: #1b1f23 !important;
+  color: #e8eaed !important;
+}
+#ai-butler-inline-chat .ai-butler-quick-chat-assistant th {
+  background-color: #303840 !important;
+  color: #f1f3f4 !important;
+}
+#ai-butler-inline-chat .ai-butler-quick-chat-assistant tbody tr:nth-child(even) td {
+  background-color: #252c33 !important;
+}
+#ai-butler-inline-chat .ai-butler-quick-chat-assistant th *,
+#ai-butler-inline-chat .ai-butler-quick-chat-assistant td * {
+  color: inherit !important;
 }
 #ai-butler-inline-chat .ai-butler-quick-chat-assistant .katex-scroll-container,
 #ai-butler-inline-chat .ai-butler-quick-chat-assistant pre,
