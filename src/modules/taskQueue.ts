@@ -196,6 +196,8 @@ export type TaskCreationSource = "auto" | "manual";
 export interface TaskOptions {
   summaryMode?: string;
   forceOverwrite?: boolean;
+  /** 指定本次总结使用的提示词（如右键菜单选择的预设）；未设置时使用当前默认模板。 */
+  prompt?: string;
   /** auto 表示自动扫描创建；用户手动/批量扫描不设置或设为 manual。 */
   source?: TaskCreationSource;
 }
@@ -878,16 +880,18 @@ export class TaskQueueManager {
    *
    * @param items Zotero 文献条目数组
    * @param priority 是否优先处理
+   * @param options 任务选项（可携带指定提示词等）
    * @returns 任务ID数组
    */
   public async addTasks(
     items: Zotero.Item[],
     priority: boolean = false,
+    options?: TaskOptions,
   ): Promise<string[]> {
     const taskIds: string[] = [];
 
     for (const item of items) {
-      const taskId = await this.addTask(item, priority);
+      const taskId = await this.addTask(item, priority, options);
       taskIds.push(taskId);
     }
 

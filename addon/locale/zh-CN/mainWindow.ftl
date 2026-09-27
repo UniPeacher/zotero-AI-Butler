@@ -1,4 +1,6 @@
 menuitem-generateSummary = AI 管家生成 AI 总结
+menuitem-generateSummary-current-template = 用当前默认模板生成
+menuitem-generateSummary-preset-missing = 未找到提示词预设：{ $name }
 menuitem-multiRoundReanalyze = AI 管家生成 AI 精读
 menuitem-imageSummary = AI 管家生成一图总结
 menuitem-mindmap = AI 管家生成思维导图

@@ -503,38 +503,11 @@ export class PromptsSettingsPage {
   }
 
   private getBuiltinSummaryPresets(): PresetMap {
-    const useEnglish = getResolvedDefaultPromptLanguage() === "en-US";
-    return {
-      [getString("settings-prompts-builtin-default")]:
-        getDefaultSummaryPrompt(),
-      [getString("settings-prompts-builtin-concise")]: useEnglish
-        ? `You are an academic assistant. Summarize the paper's main problem, method, key results, and conclusion concisely in English bullet points. Paper metadata: title=${"${title}"}; authors=${"${authors}"}; year=${"${year}"}`
-        : `你是一名学术助手。请用中文以简洁的要点方式总结论文主要问题、方法、关键结果与结论。文章信息: 标题=${"${title}"}; 作者=${"${authors}"}; 年份=${"${year}"}`,
-      [getString("settings-prompts-builtin-structured")]: useEnglish
-        ? `Summarize the paper in English using six sections: Background / Method / Results / Discussion / Limitations / Conclusion. Start with: ${"${title}"} (${"${year}"}).`
-        : `请以"背景/方法/结果/讨论/局限/结论"六部分结构化总结论文; 开头写:《${"${title}"}》(${" ${year} "}).`,
-      [getString("settings-prompts-builtin-computer")]: useEnglish
-        ? `Explain this computer-science paper in English in as much detail as possible. I have general computer-science background knowledge, but not necessarily in this specific subarea. Only output the explanation of the paper; do not include greetings or small talk. Start with one paragraph summarizing the core idea of the paper.`
-        : `帮我用中文讲一下这篇计算机领域的论文，讲的越详细越好，我有通用计算机专业基础，但是没有这个小方向的基础。输出的时候只包含关于论文的讲解，不要包含寒暄的内容。开始时先用一段话总结这篇论文的核心内容。`,
-    };
+    return getBuiltinSummaryPromptPresets();
   }
 
   private getCustomSummaryPresets(): PresetMap {
-    const custom: PresetMap = {};
-    try {
-      const raw = (getPref("customPrompts") as string) || "";
-      if (raw && raw.trim()) {
-        const parsed = JSON.parse(raw);
-        Object.entries(parsed).forEach(([k, v]) => {
-          if (v && typeof v === "string") {
-            custom[k] = v;
-          }
-        });
-      }
-    } catch (e) {
-      ztoolkit.log("[PromptsSettings] Failed to parse customPrompts:", e);
-    }
-    return custom;
+    return getCustomSummaryPromptPresets();
   }
 
   private setCustomSummaryPresets(custom: PresetMap): void {
@@ -2833,4 +2806,54 @@ export class PromptsSettingsPage {
 
     contentWrapper.appendChild(tableSection);
   }
+}
+
+/**
+ * 内置 AI 总结提示词预设（模块级，供模板编辑器与右键菜单等复用）
+ */
+export function getBuiltinSummaryPromptPresets(): PresetMap {
+  const useEnglish = getResolvedDefaultPromptLanguage() === "en-US";
+  return {
+    [getString("settings-prompts-builtin-default")]: getDefaultSummaryPrompt(),
+    [getString("settings-prompts-builtin-concise")]: useEnglish
+      ? `You are an academic assistant. Summarize the paper's main problem, method, key results, and conclusion concisely in English bullet points. Paper metadata: title=${"${title}"}; authors=${"${authors}"}; year=${"${year}"}`
+      : `你是一名学术助手。请用中文以简洁的要点方式总结论文主要问题、方法、关键结果与结论。文章信息: 标题=${"${title}"}; 作者=${"${authors}"}; 年份=${"${year}"}`,
+    [getString("settings-prompts-builtin-structured")]: useEnglish
+      ? `Summarize the paper in English using six sections: Background / Method / Results / Discussion / Limitations / Conclusion. Start with: ${"${title}"} (${"${year}"}).`
+      : `请以"背景/方法/结果/讨论/局限/结论"六部分结构化总结论文; 开头写:《${"${title}"}》(${" ${year} "}).`,
+    [getString("settings-prompts-builtin-computer")]: useEnglish
+      ? `Explain this computer-science paper in English in as much detail as possible. I have general computer-science background knowledge, but not necessarily in this specific subarea. Only output the explanation of the paper; do not include greetings or small talk. Start with one paragraph summarizing the core idea of the paper.`
+      : `帮我用中文讲一下这篇计算机领域的论文，讲的越详细越好，我有通用计算机专业基础，但是没有这个小方向的基础。输出的时候只包含关于论文的讲解，不要包含寒暄的内容。开始时先用一段话总结这篇论文的核心内容。`,
+  };
+}
+
+/**
+ * 用户自定义 AI 总结提示词预设（customPrompts 偏好，键为预设名）
+ */
+export function getCustomSummaryPromptPresets(): PresetMap {
+  const custom: PresetMap = {};
+  try {
+    const raw = (getPref("customPrompts") as string) || "";
+    if (raw && raw.trim()) {
+      const parsed = JSON.parse(raw);
+      Object.entries(parsed).forEach(([k, v]) => {
+        if (v && typeof v === "string") {
+          custom[k] = v;
+        }
+      });
+    }
+  } catch (e) {
+    ztoolkit.log("[PromptsSettings] Failed to parse customPrompts:", e);
+  }
+  return custom;
+}
+
+/**
+ * 全部 AI 总结提示词预设（内置 + 自定义），供右键菜单选择
+ */
+export function collectSummaryPromptPresets(): PresetMap {
+  return {
+    ...getBuiltinSummaryPromptPresets(),
+    ...getCustomSummaryPromptPresets(),
+  };
 }

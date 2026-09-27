@@ -158,6 +158,8 @@ export class NoteGenerator {
     options?: {
       summaryMode?: string;
       forceOverwrite?: boolean;
+      /** 指定本次总结使用的提示词；未设置时使用当前默认模板。 */
+      prompt?: string;
       abortSignal?: LLMAbortSignal;
     },
   ): Promise<{ note: Zotero.Item; content: string }> {
@@ -365,6 +367,7 @@ export class NoteGenerator {
           isBase64,
           pdfAttachmentMode,
           prefMode,
+          prompt: options?.prompt,
           outputWindow,
           progressCallback,
           streamCallback,
@@ -395,6 +398,7 @@ export class NoteGenerator {
         if (useMultiPdfMode) {
           response = await LLMService.generate({
             task: "summary",
+            prompt: options?.prompt,
             content: {
               kind: "zotero-item",
               item,
@@ -410,6 +414,7 @@ export class NoteGenerator {
         } else {
           response = await LLMService.generate({
             task: "summary",
+            prompt: options?.prompt,
             content: {
               kind: "zotero-item",
               item,
@@ -640,6 +645,7 @@ export class NoteGenerator {
     isBase64: boolean;
     pdfAttachmentMode: string;
     prefMode: string;
+    prompt?: string;
     outputWindow?: SummaryView;
     progressCallback?: (
       message: string,
@@ -658,6 +664,7 @@ export class NoteGenerator {
       isBase64,
       pdfAttachmentMode,
       prefMode,
+      prompt,
       outputWindow,
       progressCallback,
       streamCallback,
@@ -691,6 +698,7 @@ export class NoteGenerator {
           isBase64,
           pdfAttachmentMode,
           prefMode,
+          prompt,
           abortSignal,
         });
         completed++;
@@ -816,6 +824,7 @@ export class NoteGenerator {
     isBase64: boolean;
     pdfAttachmentMode: string;
     prefMode: string;
+    prompt?: string;
     abortSignal?: LLMAbortSignal;
   }): Promise<MultiModelSummaryResult> {
     const {
@@ -827,6 +836,7 @@ export class NoteGenerator {
       isBase64,
       pdfAttachmentMode,
       prefMode,
+      prompt,
       abortSignal,
     } = params;
 
@@ -844,6 +854,7 @@ export class NoteGenerator {
     );
     const response = await LLMService.generateWithEndpoint(endpoint.id, {
       task: "summary",
+      prompt,
       content: {
         kind: "zotero-item",
         item,

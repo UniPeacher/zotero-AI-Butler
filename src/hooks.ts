@@ -26,7 +26,8 @@ import { getString, initLocale, getLocaleID } from "./utils/locale";
 import { getSelectedCollection } from "./utils/collectionSelection";
 import { registerPrefsScripts } from "./modules/preferenceScript";
 import { createZToolkit } from "./utils/ztoolkit";
-import { TaskQueueManager } from "./modules/taskQueue";
+import { TaskQueueManager, type TaskOptions } from "./modules/taskQueue";
+import { collectSummaryPromptPresets } from "./modules/views/settings/PromptsSettingsPage";
 import {
   registerLibraryStatusColumn,
   unregisterLibraryStatusColumn,
@@ -374,6 +375,8 @@ type ContextMenuScope = "item" | "collection";
 type ContextMenuDefinition = {
   scope: ContextMenuScope;
   options: any;
+  /** 标记该菜单为「AI 总结提示词预设」子菜单宿主，注册后动态填充子项。 */
+  presetMenu?: boolean;
 };
 
 const CONTEXT_MENU_ROOT_DOM_IDS: Record<ContextMenuScope, string> = {
@@ -491,6 +494,61 @@ function registerContextMenuElement(
   }
   bindContextMenuVisibilityUpdater(popup);
   popup.appendChild(createContextMenuElement(doc, options));
+}
+
+/**
+ * 按当前模板库重建「AI 总结提示词预设」子菜单项。
+ * 每次弹出时实时读取，预设的新建/删除会自动同步到右键菜单。
+ */
+function buildSummaryPresetMenuItems(doc: Document, popup: Element): void {
+  while (popup.firstChild) {
+    popup.removeChild(popup.firstChild);
+  }
+  const currentItem = doc.createXULElement("menuitem");
+  currentItem.setAttribute(
+    "label",
+    getString("menuitem-generateSummary-current-template"),
+  );
+  currentItem.addEventListener("command", () => {
+    void handleGenerateSummary();
+  });
+  popup.appendChild(currentItem);
+
+  const presets = collectSummaryPromptPresets();
+  const names = Object.keys(presets).filter(
+    (name) => typeof presets[name] === "string" && presets[name].trim(),
+  );
+  if (names.length > 0) {
+    popup.appendChild(doc.createXULElement("menuseparator"));
+  }
+  for (const name of names) {
+    const promptText = presets[name];
+    const item = doc.createXULElement("menuitem");
+    item.setAttribute("label", name);
+    item.setAttribute(
+      "tooltiptext",
+      promptText.length > 400 ? `${promptText.slice(0, 400)}…` : promptText,
+    );
+    item.addEventListener("command", () => {
+      void handleGenerateSummary(name);
+    });
+    popup.appendChild(item);
+  }
+}
+
+/**
+ * 为「AI 管家生成 AI 总结」菜单挂载预设子菜单的动态填充逻辑
+ */
+function bindSummaryPresetMenuPopup(doc: Document): void {
+  const menuEl = doc.getElementById(
+    CONTEXT_MENU_DOM_IDS.generateSummary,
+  ) as XUL.Menu | null;
+  const popup = menuEl?.querySelector("menupopup") as XUL.MenuPopup | null;
+  if (!popup || (popup as any).__aiButlerPresetMenuBound) return;
+  (popup as any).__aiButlerPresetMenuBound = true;
+  popup.addEventListener("popupshowing", () => {
+    buildSummaryPresetMenuItems(doc, popup);
+  });
 }
 
 async function isContextMenuOptionVisible(
@@ -1168,14 +1226,12 @@ function registerContextMenuItem(win?: Window) {
   const menuDefinitions: Record<ContextMenuItemId, ContextMenuDefinition> = {
     generateSummary: {
       scope: "item",
+      presetMenu: true,
       options: {
-        tag: "menuitem",
+        tag: "menu",
         id: CONTEXT_MENU_DOM_IDS.generateSummary,
         label: getString("menuitem-generateSummary"),
         icon: menuIcon,
-        commandListener: (_ev: Event) => {
-          handleGenerateSummary();
-        },
         getVisibility: () =>
           isContextMenuItemEnabled("generateSummary") &&
           isRegularItemSelection(),
@@ -1337,6 +1393,9 @@ function registerContextMenuItem(win?: Window) {
         definition.scope,
         definition.options,
       );
+      if (definition.presetMenu) {
+        bindSummaryPresetMenuPopup(targetWin.document);
+      }
     }
   }
 }
@@ -1671,7 +1730,7 @@ async function handleOpenAIChat(itemId: number): Promise<void> {
  * - 区分成功和失败的条目
  * - 汇总显示批量处理统计
  */
-async function handleGenerateSummary() {
+async function handleGenerateSummary(presetName?: string) {
   // 第一步:验证 API 配置
   // 新版本以用户配置的 endpoint 列表作为主路由来源。
   let enabledEndpoints = LLMEndpointManager.getEnabledEndpoints();
@@ -1738,6 +1797,31 @@ async function handleGenerateSummary() {
     return;
   }
 
+  // 第二步半:解析右键菜单选择的提示词预设。
+  // 选择具体预设视为明确的重新生成指令，忽略"已有笔记跳过"策略(forceOverwrite)。
+  const presetPrompt = presetName
+    ? collectSummaryPromptPresets()[presetName]
+    : undefined;
+  if (
+    presetName &&
+    (typeof presetPrompt !== "string" || !presetPrompt.trim())
+  ) {
+    showAIButlerToast(
+      getString("menuitem-generateSummary-preset-missing", {
+        args: { name: presetName },
+      }),
+      "error",
+    );
+    return;
+  }
+  const taskOptions: TaskOptions | undefined = presetPrompt
+    ? {
+        summaryMode: "single",
+        prompt: presetPrompt,
+        forceOverwrite: true,
+      }
+    : undefined;
+
   // 第三步:单篇优先入队，多选按普通队列遵守批次设置
   const progressWin = new ztoolkit.ProgressWindow("AI Butler", {
     closeOnClick: true,
@@ -1747,7 +1831,7 @@ async function handleGenerateSummary() {
   try {
     const manager = TaskQueueManager.getInstance();
     const priority = items.length === 1;
-    await manager.addTasks(items, priority);
+    await manager.addTasks(items, priority, taskOptions);
     await maybeOpenTaskPanelAfterQueue();
 
     progressWin

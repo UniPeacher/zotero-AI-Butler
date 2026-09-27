@@ -1,4 +1,6 @@
 menuitem-generateSummary = Generate AI Summary
+menuitem-generateSummary-current-template = Generate with current template
+menuitem-generateSummary-preset-missing = Prompt preset not found: { $name }
 menuitem-multiRoundReanalyze = Generate AI Deep Reading
 menuitem-imageSummary = Generate One-Image Summary
 menuitem-mindmap = Generate Mind Map
