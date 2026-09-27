@@ -670,6 +670,8 @@ export type FluentMessageId =
   | 'menuitem-filemenulabel'
   | 'menuitem-fillTable'
   | 'menuitem-generateSummary'
+  | 'menuitem-generateSummary-current-template'
+  | 'menuitem-generateSummary-preset-missing'
   | 'menuitem-imageSummary'
   | 'menuitem-label'
   | 'menuitem-literatureReview'
