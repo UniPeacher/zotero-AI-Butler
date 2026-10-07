@@ -213,10 +213,6 @@ let currentChatState: ChatState = {
   savedPairIds: new Set(),
 };
 
-// 每次重新渲染快速对话区块时递增。PDF 提取和模型请求都是异步的，
-// 仅靠 itemId 还不足以阻止同一篇论文的旧渲染实例回写新状态。
-let quickChatRenderToken = 0;
-
 type SidebarAutoRefreshTarget =
   "summary" | "deepRead" | "imageSummary" | "mindmap" | "table";
 
@@ -2112,7 +2108,9 @@ function renderNoteSection(
     padding: 8px;
     border: 1px solid rgba(89, 192, 188, 0.22);
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.96);
+    /* 半透明中性底 + 背景模糊：深色界面下不再是白块配浅色字 */
+    background: rgba(100, 108, 116, 0.45);
+    backdrop-filter: blur(16px);
     color: inherit;
     box-shadow: 0 8px 22px rgba(15, 23, 42, 0.1);
     flex: 0 0 auto;
@@ -3860,10 +3858,12 @@ function renderChatArea(
 ): void {
   const isPageMode = options.mode === "page";
   const chatItemId = item.id;
-  const chatRenderToken = ++quickChatRenderToken;
+  // 过期判定：面板元素已从文档移除（区块重绘），或聊天状态已切换到其他条目。
+  // 不能用全局递增 token：同一文献会同时存在多个并存的条目面板实例
+  // （文献列表面板 + 各阅读器标签页的面板都会渲染本区块），全局 token
+  // 会让除最后渲染者之外的所有实例的发送按钮静默失效。
   const isCurrentChatRender = (): boolean =>
-    quickChatRenderToken === chatRenderToken &&
-    currentChatState.itemId === chatItemId;
+    body.isConnected && currentChatState.itemId === chatItemId;
 
   currentChatState.abortController?.abort(
     getString("itempane-quick-chat-abort-refreshed"),

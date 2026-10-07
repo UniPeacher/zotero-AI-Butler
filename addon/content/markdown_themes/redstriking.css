@@ -699,7 +699,7 @@ hr {
   height: 2px;
   padding: 0;
   margin: 16px 0;
-  background-color: #e7e7e7;
+  background-color: rgba(128, 128, 128, 0.35);
   border: 0 none;
   overflow: hidden;
   box-sizing: content-box;
@@ -766,8 +766,9 @@ h6 p {
 blockquote {
   border-left: 4px solid rgb(239, 112, 96);
   padding: 10px 15px;
-  color: #3f3f3f;
-  background-color: #fff9f9;
+  /* 半透明中性底 + 继承文字色：深浅色界面下都可读（原 #fff9f9/#3f3f3f 在深色模式下是刺眼白块） */
+  color: inherit;
+  background-color: rgba(128, 128, 128, 0.12);
 }
 
 table {
@@ -783,7 +784,7 @@ table tr {
 
 table tr:nth-child(2n),
 thead {
-  background-color: #fafafa;
+  background-color: rgba(128, 128, 128, 0.15);
 }
 
 table tr th {
@@ -892,7 +893,7 @@ tt {
     "微软雅黑" !important;
   font-size: 0.92rem;
   color: #ff3502;
-  background-color: #f8f5ec;
+  background-color: rgba(128, 128, 128, 0.15);
   /* color: #c7254e;
     background-color: #f9f2f4;  */
 }
@@ -902,7 +903,7 @@ tt {
 }
 
 #write .md-footnote {
-  background-color: #f8f8f8;
+  background-color: rgba(128, 128, 128, 0.12);
   color: #e96900;
 }
 
