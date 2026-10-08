@@ -213,6 +213,10 @@ let currentChatState: ChatState = {
   savedPairIds: new Set(),
 };
 
+// 每个条目面板元素(body)各自持有的快速追问渲染代号，用于淘汰同一面板的旧渲染实例。
+// 按 body 隔离，避免并存的多个面板实例互相失效。
+const quickChatRenderTokens = new WeakMap<HTMLElement, number>();
+
 type SidebarAutoRefreshTarget =
   "summary" | "deepRead" | "imageSummary" | "mindmap" | "table";
 
@@ -3858,12 +3862,17 @@ function renderChatArea(
 ): void {
   const isPageMode = options.mode === "page";
   const chatItemId = item.id;
-  // 过期判定：面板元素已从文档移除（区块重绘），或聊天状态已切换到其他条目。
-  // 不能用全局递增 token：同一文献会同时存在多个并存的条目面板实例
-  // （文献列表面板 + 各阅读器标签页的面板都会渲染本区块），全局 token
-  // 会让除最后渲染者之外的所有实例的发送按钮静默失效。
+  // 过期判定分两层：
+  // 1) 同一面板元素(body)的旧渲染实例必须失效——重绘后旧实例不得回写全局聊天状态；
+  // 2) 聊天状态必须仍属于当前条目。
+  // 代号按 body 各自持有：同一文献会同时存在多个并存的条目面板实例
+  // （文献列表面板 + 各阅读器标签页的面板），用全局代号会让除最后渲染者之外的
+  // 实例全部失效；也不能用 body.isConnected 判定，因为首次渲染时面板尚未插入文档。
+  const chatRenderToken = (quickChatRenderTokens.get(body) ?? 0) + 1;
+  quickChatRenderTokens.set(body, chatRenderToken);
   const isCurrentChatRender = (): boolean =>
-    body.isConnected && currentChatState.itemId === chatItemId;
+    quickChatRenderTokens.get(body) === chatRenderToken &&
+    currentChatState.itemId === chatItemId;
 
   currentChatState.abortController?.abort(
     getString("itempane-quick-chat-abort-refreshed"),
